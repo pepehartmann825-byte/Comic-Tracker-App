@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comic App Pro</title>
+
+<style>
+body{margin:0;font-family:Arial;background:#0a0a0a;color:white;text-align:center;}
+h1{color:#00ff99;}
+input,button{padding:10px;margin:5px;border-radius:8px;border:none;}
+button{background:#00ff99;cursor:pointer;}
+.card{background:#1a1a1a;margin:10px;padding:10px;border-radius:10px;text-align:left;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;padding:10px;}
+.small{font-size:12px;opacity:0.7;}
+</style>
+</head>
+
+<body>
+
+<h1>📚 Comic App PRO</h1>
+
+<!-- USER LOGIN -->
+<h3>🔐 User Login</h3>
+<input id="user" placeholder="Username">
+<input id="pass" placeholder="Passwort" type="password">
+<button onclick="login()">Login / Registrieren</button>
+<button onclick="logout()">Logout</button>
+
+<p id="status">Nicht eingeloggt</p>
+
+<!-- EDITOR -->
+<h3>🛠 Editor</h3>
+<button onclick="editorLogin()">Editor Login</button>
+<p id="editorStatus">Editor: AUS</p>
+
+<div id="editorBox" style="display:none;">
+  <input id="title" placeholder="Titel">
+  <input id="pages" placeholder="Seiten">
+  <button onclick="addComic()">➕ Comic posten</button>
+</div>
+
+<!-- SEARCH -->
+<h3>🔍 Suche</h3>
+<input id="search" placeholder="Comic suchen..." oninput="filterComics()">
+
+<!-- STATS -->
+<h2>📦 Deine Sammlung</h2>
+<p id="stats">0 Comics | 0 Seiten</p>
+
+<!-- FEED -->
+<div id="feed" class="grid"></div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  getDocs,
+  addDoc,
+  deleteDoc,
+  doc,
+  getDoc,
+  setDoc
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+/* 🔥 FIREBASE */
+const firebaseConfig = {
+  apiKey: "YOUR_KEY",
+  authDomain: "comic-tracker-11dce.firebaseapp.com",
+  projectId: "comic-tracker-11dce",
+  storageBucket: "comic-tracker-11dce.firebasestorage.app",
+  messagingSenderId: "353269603215",
+  appId: "1:353269603215:web:6594986b906d838f0149fa"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+/* STATE */
+let currentUser = null;
+let allComics = [];
+let myCollection = [];
+let isEditor = false;
+
+/* 🔐 USER LOGIN */
+window.login = async function(){
+
+  let username = document.getElementById("user").value.trim();
+  let password = document.getElementById("pass").value;
+
+  if(!username || !password){
+    alert("Bitte alles eingeben");
+    return;
+  }
+
+  const ref = doc(db,"users",username);
+  const snap = await getDoc(ref);
+
+  if(snap.exists()){
+    if(snap.data().password !== password){
+      alert("Falsches Passwort!");
+      return;
+    }
+    myCollection = snap.data().comics || [];
+  } else {
+    await setDoc(ref,{ password, comics:[] });
+    myCollection = [];
+  }
+
+  currentUser = username;
+  document.getElementById("status").innerText = "👤 " + username;
+
+  loadFeed();
+}
+
+/* LOGOUT */
+window.logout = function(){
+  currentUser = null;
+  myCollection = [];
+  document.getElementById("status").innerText = "Nicht eingeloggt";
+  loadFeed();
+}
+
+/* 🛠 EDITOR LOGIN */
+window.editorLogin = function(){
+  let pass = prompt("Editor Passwort:");
+
+  if(pass === "1234"){
+    isEditor = true;
+    document.getElementById("editorStatus").innerText = "Editor: AKTIV";
+    document.getElementById("editorBox").style.display = "block";
+  } else {
+    alert("Falsch!");
+  }
+}
+
+/* ➕ ADD COMIC */
+window.addComic = async function(){
+
+  if(!isEditor){
+    alert("Nur Editor!");
+    return;
+  }
+
+  let title = document.getElementById("title").value;
+  let pages = parseInt(document.getElementById("pages").value);
+
+  if(!title || isNaN(pages)){
+    alert("Fehlerhafte Eingabe");
+    return;
+  }
+
+  await addDoc(collection(db,"comics"),{
+    title,
+    pages,
+    created: Date.now()
+  });
+
+  loadFeed();
+}
+
+/* 💾 SAVE COLLECTION */
+async function saveCollection(){
+
+  if(!currentUser) return;
+
+  await setDoc(doc(db,"users",currentUser),{
+    password: document.getElementById("pass").value,
+    comics: myCollection
+  });
+}
+
+/* LOAD */
+async function loadFeed(){
+
+  let snap = await getDocs(collection(db,"comics"));
+
+  allComics = [];
+
+  snap.forEach(d=>{
+    allComics.push({ id:d.id, ...d.data() });
+  });
+
+  render(allComics);
+  updateStats();
+}
+
+/* RENDER */
+function render(list){
+
+  let box = document.getElementById("feed");
+  box.innerHTML = "";
+
+  list.forEach(c=>{
+
+    let added = myCollection.includes(c.id);
+
+    box.innerHTML += `
+      <div class="card">
+        <h3>${c.title}</h3>
+        <p class="small">${c.pages} Seiten</p>
+
+        ${
+          currentUser
+          ? (added
+            ? `<button disabled>✔ In Sammlung</button>`
+            : `<button onclick="addToCollection('${c.id}')">➕ Hinzufügen</button>`
+          )
+          : `<p class="small">Login nötig</p>`
+        }
+
+        ${
+          isEditor
+          ? `<button onclick="deleteComic('${c.id}')">🗑 Löschen</button>`
+          : ""
+        }
+      </div>
+    `;
+  });
+}
+
+/* ➕ ADD TO COLLECTION */
+window.addToCollection = async function(id){
+
+  if(!currentUser) return;
+
+  if(!myCollection.includes(id)){
+    myCollection.push(id);
+    await saveCollection();
+  }
+
+  render(allComics);
+  updateStats();
+}
+
+/* 🗑 DELETE */
+window.deleteComic = async function(id){
+
+  if(!isEditor) return;
+
+  await deleteDoc(doc(db,"comics",id));
+
+  loadFeed();
+}
+
+/* 🔍 SEARCH */
+window.filterComics = function(){
+
+  let val = document.getElementById("search").value.toLowerCase();
+
+  let filtered = allComics.filter(c =>
+    c.title.toLowerCase().includes(val)
+  );
+
+  render(filtered);
+}
+
+/* 📊 STATS */
+function updateStats(){
+
+  let total = 0;
+
+  myCollection.forEach(id=>{
+    let c = allComics.find(x=>x.id === id);
+    if(c) total += c.pages;
+  });
+
+  document.getElementById("stats").innerText =
+    `${myCollection.length} Comics | ${total} Seiten`;
+}
+
+/* START */
+loadFeed();
+
+</script>
+
+</body>
+</html>

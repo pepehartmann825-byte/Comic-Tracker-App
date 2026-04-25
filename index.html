@@ -3,276 +3,391 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Comic App Pro</title>
+<title>Comic App</title>
 
 <style>
-body{margin:0;font-family:Arial;background:#0a0a0a;color:white;text-align:center;}
-h1{color:#00ff99;}
-input,button{padding:10px;margin:5px;border-radius:8px;border:none;}
-button{background:#00ff99;cursor:pointer;}
-.card{background:#1a1a1a;margin:10px;padding:10px;border-radius:10px;text-align:left;}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;padding:10px;}
-.small{font-size:12px;opacity:0.7;}
+body{
+  margin:0;
+  font-family:Arial;
+  background:#0d0d0d;
+  color:white;
+}
+
+/* HEADER */
+h1{
+  text-align:center;
+  color:#00ff99;
+  margin:15px;
+  font-size:28px;
+}
+
+/* NAV */
+.nav{
+  display:flex;
+  background:#111;
+  border-bottom:1px solid #222;
+}
+
+.nav button{
+  flex:1;
+  padding:16px;
+  border:none;
+  background:none;
+  color:#aaa;
+  cursor:pointer;
+  font-size:16px;
+}
+
+.nav button.active{
+  color:#00ff99;
+}
+
+/* SCREENS */
+.screen{
+  display:none;
+  padding:15px;
+}
+
+.screen.active{
+  display:block;
+}
+
+/* CARDS */
+.card{
+  background:#161616;
+  margin:12px;
+  padding:14px;
+  border-radius:14px;
+  font-size:16px;
+}
+
+/* INPUTS */
+input,button{
+  padding:14px;
+  margin:6px;
+  border-radius:10px;
+  border:none;
+  font-size:16px;
+}
+
+button{
+  background:#1f1f1f;
+  color:white;
+}
+
+button:hover{
+  background:#00ff99;
+  color:black;
+}
+
+/* SMALL TEXT */
+.small{
+  font-size:13px;
+  opacity:0.7;
+}
+
+/* GRID */
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+  gap:12px;
+}
+
+/* EDITOR BOX */
+#editorBox{
+  display:none;
+  background:#121212;
+  padding:10px;
+  border-radius:12px;
+  margin:10px;
+  border:1px solid #222;
+}
 </style>
 </head>
 
 <body>
 
-<h1>📚 Comic App PRO</h1>
+<h1>📚 Comic App</h1>
 
-<!-- USER LOGIN -->
-<h3>🔐 User Login</h3>
-<input id="user" placeholder="Username">
-<input id="pass" placeholder="Passwort" type="password">
-<button onclick="login()">Login / Registrieren</button>
-<button onclick="logout()">Logout</button>
-
-<p id="status">Nicht eingeloggt</p>
-
-<!-- EDITOR -->
-<h3>🛠 Editor</h3>
-<button onclick="editorLogin()">Editor Login</button>
-<p id="editorStatus">Editor: AUS</p>
-
-<div id="editorBox" style="display:none;">
-  <input id="title" placeholder="Titel">
-  <input id="pages" placeholder="Seiten">
-  <button onclick="addComic()">➕ Comic posten</button>
+<!-- NAV -->
+<div class="nav">
+<button onclick="show('home')" class="active">🏠 Surfen</button>
+<button onclick="show('collection')">📚 Sammlung</button>
+<button onclick="show('profile')">👤 Profil</button>
 </div>
 
-<!-- SEARCH -->
-<h3>🔍 Suche</h3>
+<!-- 🏠 SURF -->
+<div id="home" class="screen active">
+
+<h3>🏠 Surfen</h3>
+
 <input id="search" placeholder="Comic suchen..." oninput="filterComics()">
 
-<!-- STATS -->
-<h2>📦 Deine Sammlung</h2>
+<!-- EDITOR -->
+<div id="editorBox">
+<h4>🛠 Editor Mode</h4>
+<input id="title" placeholder="Titel">
+<input id="pages" placeholder="Seiten">
+<button onclick="addComic()">➕ Posten</button>
+</div>
+
+<div id="feed" class="grid"></div>
+
+</div>
+
+<!-- 📚 SAMMLUNG -->
+<div id="collection" class="screen">
+
+<h3>📚 Deine Sammlung</h3>
 <p id="stats">0 Comics | 0 Seiten</p>
 
-<!-- FEED -->
-<div id="feed" class="grid"></div>
+<div id="myList"></div>
+
+</div>
+
+<!-- 👤 PROFIL -->
+<div id="profile" class="screen">
+
+<h3>👤 Login</h3>
+
+<input id="user" placeholder="Username">
+<input id="pass" type="password" placeholder="Passwort">
+
+<button onclick="login()">Login</button>
+<button onclick="logout()">Logout</button>
+
+<br><br>
+
+<button onclick="editorLogin()">🛠 Editor aktivieren</button>
+
+<p id="status">Nicht eingeloggt</p>
+<p id="editorStatus">Editor: AUS</p>
+
+</div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getFirestore,
-  collection,
-  getDocs,
-  addDoc,
-  deleteDoc,
-  doc,
-  getDoc,
-  setDoc
+getFirestore,
+collection,
+getDocs,
+addDoc,
+deleteDoc,
+doc,
+getDoc,
+setDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-/* 🔥 FIREBASE */
+/* FIREBASE */
 const firebaseConfig = {
-  apiKey: "YOUR_KEY",
-  authDomain: "comic-tracker-11dce.firebaseapp.com",
-  projectId: "comic-tracker-11dce",
-  storageBucket: "comic-tracker-11dce.firebasestorage.app",
-  messagingSenderId: "353269603215",
-  appId: "1:353269603215:web:6594986b906d838f0149fa"
+apiKey: "YOUR_KEY",
+authDomain: "comic-tracker-11dce.firebaseapp.com",
+projectId: "comic-tracker-11dce",
+storageBucket: "comic-tracker-11dce.firebasestorage.app",
+messagingSenderId: "353269603215",
+appId: "1:353269603215:web:6594986b906d838f0149fa"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 /* STATE */
-let currentUser = null;
-let allComics = [];
-let myCollection = [];
-let isEditor = false;
+let user=null;
+let comics=[];
+let my=[];
+let editor=false;
 
-/* 🔐 USER LOGIN */
-window.login = async function(){
+/* NAV SWITCH */
+window.show=function(id){
 
-  let username = document.getElementById("user").value.trim();
-  let password = document.getElementById("pass").value;
+document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+document.getElementById(id).classList.add("active");
 
-  if(!username || !password){
-    alert("Bitte alles eingeben");
-    return;
-  }
+document.querySelectorAll(".nav button").forEach(b=>b.classList.remove("active"));
+event.target.classList.add("active");
 
-  const ref = doc(db,"users",username);
-  const snap = await getDoc(ref);
+}
 
-  if(snap.exists()){
-    if(snap.data().password !== password){
-      alert("Falsches Passwort!");
-      return;
-    }
-    myCollection = snap.data().comics || [];
-  } else {
-    await setDoc(ref,{ password, comics:[] });
-    myCollection = [];
-  }
+/* LOGIN */
+window.login=async function(){
 
-  currentUser = username;
-  document.getElementById("status").innerText = "👤 " + username;
+let u=document.getElementById("user").value;
+let p=document.getElementById("pass").value;
 
-  loadFeed();
+if(!u||!p)return;
+
+let ref=doc(db,"users",u);
+let snap=await getDoc(ref);
+
+if(snap.exists()){
+if(snap.data().password!==p)return alert("Falsch");
+my=snap.data().comics||[];
+}else{
+await setDoc(ref,{password:p,comics:[]});
+my=[];
+}
+
+user=u;
+document.getElementById("status").innerText="👤 "+u;
+
+load();
 }
 
 /* LOGOUT */
-window.logout = function(){
-  currentUser = null;
-  myCollection = [];
-  document.getElementById("status").innerText = "Nicht eingeloggt";
-  loadFeed();
+window.logout=function(){
+user=null;
+my=[];
+document.getElementById("status").innerText="Nicht eingeloggt";
+load();
 }
 
-/* 🛠 EDITOR LOGIN */
-window.editorLogin = function(){
-  let pass = prompt("Editor Passwort:");
+/* EDITOR */
+window.editorLogin=function(){
 
-  if(pass === "1234"){
-    isEditor = true;
-    document.getElementById("editorStatus").innerText = "Editor: AKTIV";
-    document.getElementById("editorBox").style.display = "block";
-  } else {
-    alert("Falsch!");
-  }
+let pw=prompt("Editor Passwort:");
+
+if(pw==="1234"){
+editor=true;
+document.getElementById("editorStatus").innerText="Editor: AN";
+document.getElementById("editorBox").style.display="block";
+}else{
+alert("Falsch");
 }
 
-/* ➕ ADD COMIC */
-window.addComic = async function(){
-
-  if(!isEditor){
-    alert("Nur Editor!");
-    return;
-  }
-
-  let title = document.getElementById("title").value;
-  let pages = parseInt(document.getElementById("pages").value);
-
-  if(!title || isNaN(pages)){
-    alert("Fehlerhafte Eingabe");
-    return;
-  }
-
-  await addDoc(collection(db,"comics"),{
-    title,
-    pages,
-    created: Date.now()
-  });
-
-  loadFeed();
 }
 
-/* 💾 SAVE COLLECTION */
-async function saveCollection(){
+/* ADD COMIC */
+window.addComic=async function(){
 
-  if(!currentUser) return;
+if(!editor)return;
 
-  await setDoc(doc(db,"users",currentUser),{
-    password: document.getElementById("pass").value,
-    comics: myCollection
-  });
+let t=document.getElementById("title").value;
+let p=parseInt(document.getElementById("pages").value);
+
+if(!t||isNaN(p))return;
+
+await addDoc(collection(db,"comics"),{
+title:t,
+pages:p,
+created:Date.now()
+});
+
+load();
 }
 
 /* LOAD */
-async function loadFeed(){
+async function load(){
 
-  let snap = await getDocs(collection(db,"comics"));
+let snap=await getDocs(collection(db,"comics"));
+comics=[];
+snap.forEach(d=>comics.push({id:d.id,...d.data()}));
 
-  allComics = [];
-
-  snap.forEach(d=>{
-    allComics.push({ id:d.id, ...d.data() });
-  });
-
-  render(allComics);
-  updateStats();
+render();
 }
 
 /* RENDER */
-function render(list){
+function render(){
 
-  let box = document.getElementById("feed");
-  box.innerHTML = "";
+let feed=document.getElementById("feed");
+feed.innerHTML="";
 
-  list.forEach(c=>{
+comics.forEach(c=>{
 
-    let added = myCollection.includes(c.id);
+let added=my.includes(c.id);
 
-    box.innerHTML += `
-      <div class="card">
-        <h3>${c.title}</h3>
-        <p class="small">${c.pages} Seiten</p>
+feed.innerHTML+=`
+<div class="card">
+<h4>${c.title}</h4>
+<p class="small">${c.pages} Seiten</p>
 
-        ${
-          currentUser
-          ? (added
-            ? `<button disabled>✔ In Sammlung</button>`
-            : `<button onclick="addToCollection('${c.id}')">➕ Hinzufügen</button>`
-          )
-          : `<p class="small">Login nötig</p>`
-        }
+${user?
+(added?
+`<button disabled>✔ drin</button>`
+:`<button onclick="add('${c.id}')">➕ hinzufügen</button>`):
+`<p class="small">Login nötig</p>`}
 
-        ${
-          isEditor
-          ? `<button onclick="deleteComic('${c.id}')">🗑 Löschen</button>`
-          : ""
-        }
-      </div>
-    `;
-  });
+${editor?`<button onclick="del('${c.id}')">🗑</button>`:""}
+</div>
+`;
+});
+
+// SAMMLUNG
+let box=document.getElementById("myList");
+box.innerHTML="";
+
+let total=0;
+
+my.forEach(id=>{
+let c=comics.find(x=>x.id===id);
+if(c){
+total+=c.pages;
+box.innerHTML+=`<div class="card">${c.title} (${c.pages})</div>`;
+}
+});
+
+document.getElementById("stats").innerText=
+`${my.length} Comics | ${total} Seiten`;
 }
 
-/* ➕ ADD TO COLLECTION */
-window.addToCollection = async function(id){
+/* ADD */
+window.add=async function(id){
 
-  if(!currentUser) return;
-
-  if(!myCollection.includes(id)){
-    myCollection.push(id);
-    await saveCollection();
-  }
-
-  render(allComics);
-  updateStats();
+if(!my.includes(id)){
+my.push(id);
+await setDoc(doc(db,"users",user),{
+password:document.getElementById("pass").value,
+comics:my
+});
 }
 
-/* 🗑 DELETE */
-window.deleteComic = async function(id){
+render();
 
-  if(!isEditor) return;
-
-  await deleteDoc(doc(db,"comics",id));
-
-  loadFeed();
 }
 
-/* 🔍 SEARCH */
-window.filterComics = function(){
+/* DELETE */
+window.del=async function(id){
 
-  let val = document.getElementById("search").value.toLowerCase();
+if(!editor)return;
 
-  let filtered = allComics.filter(c =>
-    c.title.toLowerCase().includes(val)
-  );
+await deleteDoc(doc(db,"comics",id));
+load();
 
-  render(filtered);
 }
 
-/* 📊 STATS */
-function updateStats(){
+/* SEARCH */
+window.filterComics=function(){
 
-  let total = 0;
+let v=document.getElementById("search").value.toLowerCase();
 
-  myCollection.forEach(id=>{
-    let c = allComics.find(x=>x.id === id);
-    if(c) total += c.pages;
-  });
+let f=comics.filter(c=>c.title.toLowerCase().includes(v));
 
-  document.getElementById("stats").innerText =
-    `${myCollection.length} Comics | ${total} Seiten`;
+let feed=document.getElementById("feed");
+feed.innerHTML="";
+
+f.forEach(c=>{
+
+let added=my.includes(c.id);
+
+feed.innerHTML+=`
+<div class="card">
+<h4>${c.title}</h4>
+<p class="small">${c.pages} Seiten</p>
+
+${user?
+(added?
+`<button disabled>✔ drin</button>`
+:`<button onclick="add('${c.id}')">➕ hinzufügen</button>`):
+`<p class="small">Login nötig</p>`}
+</div>
+`;
+
+});
+
 }
 
 /* START */
-loadFeed();
+load();
 
 </script>
 
